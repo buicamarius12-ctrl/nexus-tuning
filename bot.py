@@ -6,7 +6,6 @@ import discord
 from discord.ext import commands
 
 # --- 1. BAZĂ DE DATE SIMPLĂ ÎN MEMORIE PENTRU PONTAJ ---
-# Salvează turele active și totalul de ore lucrate
 active_shifts = {}  # {user_id: start_time}
 user_hours = {}     # {user_id: total_seconds}
 
@@ -23,7 +22,6 @@ def stop_pontaj_user(user_id):
     duration = datetime.now() - start_time
     seconds_worked = int(duration.total_seconds())
     
-    # Adăugăm la totalul utilizatorului
     user_hours[user_id] = user_hours.get(user_id, 0) + seconds_worked
     
     hours = seconds_worked // 3600
@@ -33,7 +31,6 @@ def stop_pontaj_user(user_id):
 def get_ore_user(user_id):
     total_seconds = user_hours.get(user_id, 0)
     
-    # Dacă este în tură acum, adăugăm și timpul curent
     if user_id in active_shifts:
         current_duration = datetime.now() - active_shifts[user_id]
         total_seconds += int(current_duration.total_seconds())
@@ -41,6 +38,10 @@ def get_ore_user(user_id):
     hours = total_seconds // 3600
     minutes = (total_seconds % 3600) // 60
     return hours, minutes
+
+def reset_all_pontaje():
+    active_shifts.clear()
+    user_hours.clear()
 
 # --- 2. SERVER WEB PENTRU KEEP-ALIVE PE RENDER ---
 app = Flask('')
@@ -104,7 +105,8 @@ async def on_ready():
 
     print(f"🤖 Botul este online și conectat ca {bot.user}!")
 
-# --- 6. COMANDA SETUP PONTAJ ---
+# --- 6. COMENZI SLASH ---
+
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
 async def setup_pontaj(interaction: discord.Interaction):
     await interaction.response.defer()
@@ -123,6 +125,61 @@ async def setup_pontaj(interaction: discord.Interaction):
     embed.set_footer(text="Nexus Tuning • Keep tuning, keep driving! 🛠️")
     
     await interaction.followup.send(embed=embed, view=PontajView())
+
+@bot.tree.command(name="pontaje", description="Trimite lista cu pontajele tuturor mecanicilor în mesaj privat (DM)")
+async def pontaje(interaction: discord.Interaction):
+    # Preluăm comanda doar pentru cel care a executat-o (ephemeral)
+    await interaction.response.defer(ephemeral=True)
+    
+    all_users = set(user_hours.keys()).union(set(active_shifts.keys()))
+    
+    if not all_users:
+        await interaction.followup.send("📋 **Nu există niciun pontaj înregistrat momentan!**", ephemeral=True)
+        return
+
+    embed = discord.Embed(
+        title="📋 Lista Pontaje — Nexus Tuning",
+        description="Mai jos regăsești situația tuturor mecanicilor:",
+        color=discord.Color.gold()
+    )
+
+    lista_text = ""
+    for user_id in all_users:
+        ore, minute = get_ore_user(user_id)
+        status = "🟢 în tură" if user_id in active_shifts else "🔴 Off"
+        lista_text += f"• <@{user_id}> [{status}] — **{ore}h {minute}m**\n"
+
+    embed.add_field(name="Mecanici Pontați", value=lista_text, inline=False)
+    embed.set_footer(text="Nexus Tuning • Raport generat automat")
+
+    try:
+        # Încercăm să trimitem în DM (mesaj privat)
+        await interaction.user.send(embed=embed)
+        await interaction.followup.send("📩 **Lista de pontaje ți-a fost trimisă în mesaj privat (DM)!**", ephemeral=True)
+    except discord.Forbidden:
+        # În caz că utilizatorul are mesajele private închise
+        await interaction.followup.send("⚠️ Nu am putut să-ți trimit mesaj privat. Verifică dacă ai opțiunea 'Allow Direct Messages' activată pe server!", ephemeral=True)
+
+@bot.tree.command(name="stop_pontaj_user", description="Oprește forțat tura unui mecanic")
+async def stop_pontaj_user_cmd(interaction: discord.Interaction, user: discord.Member, salveaza_orele: bool = True):
+    await interaction.response.defer(ephemeral=True)
+    
+    if user.id not in active_shifts:
+        await interaction.followup.send(f"⚠️ {user.mention} nu este în tură în acest moment.", ephemeral=True)
+        return
+
+    if salveaza_orele:
+        ore, minute = stop_pontaj_user(user.id)
+        await interaction.followup.send(f"🔴 **Pontaj oprit forțat!** I s-a oprit tura lui {user.mention}. I s-au salvat **{ore}h și {minute}m**.", ephemeral=True)
+    else:
+        active_shifts.pop(user.id, None)
+        await interaction.followup.send(f"🚫 **Pontaj anulat complet!** Tura activă a lui {user.mention} a fost ștearsă fără salvare.", ephemeral=True)
+
+@bot.tree.command(name="reset_pontaje", description="Resetează toate pontajele din baza de date")
+async def reset_pontaje(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    reset_all_pontaje()
+    await interaction.followup.send("🧹 **Toate pontajele au fost șterse cu succes!**", ephemeral=True)
 
 # --- 7. PORNIRE BOT ---
 TOKEN = os.environ.get('DISCORD_TOKEN')
