@@ -5,6 +5,9 @@ from flask import Flask
 import discord
 from discord.ext import commands
 
+# Numele rolului permis
+ROL_PERMIS = "pontaje"
+
 # --- 1. BAZĂ DE DATE SIMPLĂ ÎN MEMORIE PENTRU PONTAJ ---
 active_shifts = {}  # {user_id: start_time}
 user_hours = {}     # {user_id: total_seconds}
@@ -42,6 +45,12 @@ def get_ore_user(user_id):
 def reset_all_pontaje():
     active_shifts.clear()
     user_hours.clear()
+
+# Funcție helper pentru verificarea rolului
+def are_rolul_permis(interaction: discord.Interaction) -> bool:
+    if not isinstance(interaction.user, discord.Member):
+        return False
+    return any(role.name.lower() == ROL_PERMIS.lower() for role in interaction.user.roles)
 
 # --- 2. SERVER WEB PENTRU KEEP-ALIVE PE RENDER ---
 app = Flask('')
@@ -97,6 +106,7 @@ class PontajView(discord.ui.View):
 # --- 5. EVENIMENT LA PORNIRE ---
 @bot.event
 async def on_ready():
+    bot.add_view(PontajView())
     try:
         synced = await bot.tree.sync()
         print(f"✅ Sincronizat cu succes {len(synced)} comenzi slash!")
@@ -105,12 +115,15 @@ async def on_ready():
 
     print(f"🤖 Botul este online și conectat ca {bot.user}!")
 
-# --- 6. COMENZI SLASH ---
+# --- 6. COMENZI SLASH (PROTEJATE CU ROL) ---
 
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
 async def setup_pontaj(interaction: discord.Interaction):
-    await interaction.response.defer()
-    
+    await interaction.response.defer(ephemeral=True)
+    if not are_rolul_permis(interaction):
+        await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
+        return
+
     embed = discord.Embed(
         title="🛠️ Nexus Tuning — Pontaj Mecanici",
         description=(
@@ -124,12 +137,16 @@ async def setup_pontaj(interaction: discord.Interaction):
     )
     embed.set_footer(text="Nexus Tuning • Keep tuning, keep driving! 🛠️")
     
-    await interaction.followup.send(embed=embed, view=PontajView())
+    # Se trimite panoul pe canal
+    await interaction.channel.send(embed=embed, view=PontajView())
+    await interaction.followup.send("✅ Panoul a fost creat pe canal!", ephemeral=True)
 
-@bot.tree.command(name="pontaje", description="Trimite lista cu pontajele tuturor mecanicilor în mesaj privat (DM)")
+@bot.tree.command(name="pontaje", description="Trimite lista cu orele totale ale mecanicilor în privat (DM)")
 async def pontaje(interaction: discord.Interaction):
-    # Preluăm comanda doar pentru cel care a executat-o (ephemeral)
     await interaction.response.defer(ephemeral=True)
+    if not are_rolul_permis(interaction):
+        await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
+        return
     
     all_users = set(user_hours.keys()).union(set(active_shifts.keys()))
     
@@ -138,8 +155,8 @@ async def pontaje(interaction: discord.Interaction):
         return
 
     embed = discord.Embed(
-        title="📋 Lista Pontaje — Nexus Tuning",
-        description="Mai jos regăsești situația tuturor mecanicilor:",
+        title="📋 Istoric Pontaje — Nexus Tuning",
+        description="Mai jos regăsești situația orei totale lucrate:",
         color=discord.Color.gold()
     )
 
@@ -153,16 +170,54 @@ async def pontaje(interaction: discord.Interaction):
     embed.set_footer(text="Nexus Tuning • Raport generat automat")
 
     try:
-        # Încercăm să trimitem în DM (mesaj privat)
         await interaction.user.send(embed=embed)
-        await interaction.followup.send("📩 **Lista de pontaje ți-a fost trimisă în mesaj privat (DM)!**", ephemeral=True)
+        await interaction.followup.send("📩 **Lista totală ți-a fost trimisă în privat (DM)!**", ephemeral=True)
     except discord.Forbidden:
-        # În caz că utilizatorul are mesajele private închise
-        await interaction.followup.send("⚠️ Nu am putut să-ți trimit mesaj privat. Verifică dacă ai opțiunea 'Allow Direct Messages' activată pe server!", ephemeral=True)
+        await interaction.followup.send("⚠️ Deschide mesajele private (DM) din setările Discord!", ephemeral=True)
+
+@bot.tree.command(name="ture_active", description="Trimite lista cu mecanicii aflați ÎN TURĂ ACUM în privat (DM)")
+async def ture_active(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
+    if not are_rolul_permis(interaction):
+        await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
+        return
+    
+    if not active_shifts:
+        await interaction.followup.send("🟢 **În acest moment NU există niciun mecanic în tură!**", ephemeral=True)
+        return
+
+    embed = discord.Embed(
+        title="🟢 Mecanici Active în Tură — Nexus Tuning",
+        description="Acești mecanici lucrează în atelier chiar acum:",
+        color=discord.Color.green()
+    )
+
+    lista_text = ""
+    acum = datetime.now()
+    for user_id, start_time in active_shifts.items():
+        durata = acum - start_time
+        secunde = int(durata.total_seconds())
+        ore = secunde // 3600
+        minute = (secunde % 3600) // 60
+        ora_intrare = start_time.strftime("%H:%M")
+        
+        lista_text += f"• <@{user_id}> — Intrat la ora **{ora_intrare}** (Timp activ: **{ore}h {minute}m**)\n"
+
+    embed.add_field(name="În Tură Acum", value=lista_text, inline=False)
+    embed.set_footer(text="Nexus Tuning • Monitorizare live")
+
+    try:
+        await interaction.user.send(embed=embed)
+        await interaction.followup.send("📩 **Lista turelor active ți-a fost trimisă în privat (DM)!**", ephemeral=True)
+    except discord.Forbidden:
+        await interaction.followup.send("⚠️ Deschide mesajele private (DM) din setările Discord!", ephemeral=True)
 
 @bot.tree.command(name="stop_pontaj_user", description="Oprește forțat tura unui mecanic")
 async def stop_pontaj_user_cmd(interaction: discord.Interaction, user: discord.Member, salveaza_orele: bool = True):
     await interaction.response.defer(ephemeral=True)
+    if not are_rolul_permis(interaction):
+        await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
+        return
     
     if user.id not in active_shifts:
         await interaction.followup.send(f"⚠️ {user.mention} nu este în tură în acest moment.", ephemeral=True)
@@ -178,6 +233,10 @@ async def stop_pontaj_user_cmd(interaction: discord.Interaction, user: discord.M
 @bot.tree.command(name="reset_pontaje", description="Resetează toate pontajele din baza de date")
 async def reset_pontaje(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
+    if not are_rolul_permis(interaction):
+        await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
+        return
+
     reset_all_pontaje()
     await interaction.followup.send("🧹 **Toate pontajele au fost șterse cu succes!**", ephemeral=True)
 
