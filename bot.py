@@ -172,4 +172,4 @@ threading.Thread(target=run, daemon=True).start()
 
 # --- CODUL BOTULUI TĂU DE DISCORD ---
 # (Păstrează mai jos restul codului tău existent)
-bot.run(TOKEN)
+bot.run(os.environ.get("MTUzMzY0MDc0NDkwNzE4MjE0MQ.GFMq1k.9tl9yp2V7pVyiJj2BEDEMA68M1ZizUgcAbrdoA" ))
