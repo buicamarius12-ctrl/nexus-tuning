@@ -146,5 +146,30 @@ async def reset_pontaje(interaction: discord.Interaction):
 
     reset_all_pontaje()
     await interaction.response.send_message("🧹 **Toate pontajele au fost șterse cu succes!** Baza de date Nexus Tuning a fost resetată.", ephemeral=True)
+import os
+import threading
+from flask import Flask
+import discord
+from discord.ext import commands
 
+# --- SERVER WEB PENTRU RENDER ---
+app = Flask('')
+
+
+@app.route('/')
+def home():
+  return 'Botul este online 24/7!'
+
+
+def run():
+  # Render atribuie un PORT automat în mediul său, altfel folosește 8080
+  port = int(os.environ.get('PORT', 8080))
+  app.run(host='0.0.0.0', port=port)
+
+
+# Pornim serverul web pe un fir de execuție separat (background thread)
+threading.Thread(target=run, daemon=True).start()
+
+# --- CODUL BOTULUI TĂU DE DISCORD ---
+# (Păstrează mai jos restul codului tău existent)
 bot.run(TOKEN)
