@@ -185,7 +185,9 @@ async def on_ready():
 
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
 async def setup_pontaj(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
+    # Dăm defer FĂRĂ ephemeral ca să putem trimite panoul public direct pe canal
+    await interaction.response.defer()
+    
     if not are_rolul_permis(interaction):
         await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
         return
@@ -203,9 +205,8 @@ async def setup_pontaj(interaction: discord.Interaction):
     )
     embed.set_footer(text="Nexus Tuning • Keep tuning, keep driving! 🛠️")
     
-    # Trimitem pe canal mesajul public cu panoul
-    await interaction.channel.send(embed=embed, view=PontajView())
-    await interaction.followup.send("✅ Panoul a fost postat pe canal cu succes!", ephemeral=True)
+    # Trimitem panoul public pe canal
+    await interaction.followup.send(embed=embed, view=PontajView())
 
 @bot.tree.command(name="pontaje", description="Trimite lista cu orele totale ale mecanicilor în privat (DM)")
 async def pontaje(interaction: discord.Interaction):
