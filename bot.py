@@ -115,13 +115,12 @@ async def on_ready():
 
     print(f"🤖 Botul este online și conectat ca {bot.user}!")
 
-# --- 6. COMENZI SLASH (PROTEJATE CU ROL) ---
+# --- 6. COMENZI SLASH ---
 
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
 async def setup_pontaj(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=True)
     if not are_rolul_permis(interaction):
-        await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
+        await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
         return
 
     embed = discord.Embed(
@@ -137,9 +136,8 @@ async def setup_pontaj(interaction: discord.Interaction):
     )
     embed.set_footer(text="Nexus Tuning • Keep tuning, keep driving! 🛠️")
     
-    # Se trimite panoul pe canal
-    await interaction.channel.send(embed=embed, view=PontajView())
-    await interaction.followup.send("✅ Panoul a fost creat pe canal!", ephemeral=True)
+    # Trimitem panoul public direct ca răspuns la comandă
+    await interaction.response.send_message(embed=embed, view=PontajView())
 
 @bot.tree.command(name="pontaje", description="Trimite lista cu orele totale ale mecanicilor în privat (DM)")
 async def pontaje(interaction: discord.Interaction):
