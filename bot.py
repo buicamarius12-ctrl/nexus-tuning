@@ -185,7 +185,6 @@ async def on_ready():
 
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
 async def setup_pontaj(interaction: discord.Interaction):
-    # Dăm defer FĂRĂ ephemeral ca să putem trimite panoul public direct pe canal
     await interaction.response.defer()
     
     if not are_rolul_permis(interaction):
@@ -205,7 +204,6 @@ async def setup_pontaj(interaction: discord.Interaction):
     )
     embed.set_footer(text="Nexus Tuning • Keep tuning, keep driving! 🛠️")
     
-    # Trimitem panoul public pe canal
     await interaction.followup.send(embed=embed, view=PontajView())
 
 @bot.tree.command(name="pontaje", description="Trimite lista cu orele totale ale mecanicilor în privat (DM)")
@@ -281,8 +279,8 @@ async def ture_active(interaction: discord.Interaction):
     except discord.Forbidden:
         await interaction.followup.send("⚠️ Deschide mesajele private (DM) din setările Discord!", ephemeral=True)
 
-@bot.tree.command(name="stop_pontaj_user", description="Oprește forțat tura unui mecanic")
-async def stop_pontaj_user_cmd(interaction: discord.Interaction, user: discord.Member, salveaza_orele: bool = True):
+@bot.tree.command(name="stop_pontaj_user", description="Oprește forțat tura unui mecanic (cu opțiune fără salvare)")
+async def stop_pontaj_user_cmd(interaction: discord.Interaction, user: discord.Member, fara_salvare: bool = False):
     await interaction.response.defer(ephemeral=True)
     if not are_rolul_permis(interaction):
         await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
@@ -293,16 +291,43 @@ async def stop_pontaj_user_cmd(interaction: discord.Interaction, user: discord.M
         await interaction.followup.send(f"⚠️ {user.mention} nu este în tură în acest moment.", ephemeral=True)
         return
 
-    if salveaza_orele:
-        ore, minute = stop_pontaj_user(user.id)
-        await interaction.followup.send(f"🔴 **Pontaj oprit forțat!** I s-a oprit tura lui {user.mention}. I s-au salvat **{ore}h și {minute}m**.", ephemeral=True)
-    else:
+    if fara_salvare:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM active_shifts WHERE user_id = ?", (user.id,))
         conn.commit()
         conn.close()
-        await interaction.followup.send(f"🚫 **Pontaj anulat complet!** Tura activă a lui {user.mention} a fost ștearsă fără salvare.", ephemeral=True)
+        await interaction.followup.send(f"🚫 **Pontaj anulat!** Tura activă a lui {user.mention} a fost oprită FĂRĂ salvarea orelor.", ephemeral=True)
+    else:
+        ore, minute = stop_pontaj_user(user.id)
+        await interaction.followup.send(f"🔴 **Pontaj oprit forțat!** Tura lui {user.mention} a fost oprită și i s-au salvat **{ore}h și {minute}m**.", ephemeral=True)
+
+@bot.tree.command(name="stop_toate_pontajele", description="Oprește turele TUTUROR mecanicilor aflați în tură")
+async def stop_toate_pontajele(interaction: discord.Interaction, fara_salvare: bool = False):
+    await interaction.response.defer(ephemeral=True)
+    if not are_rolul_permis(interaction):
+        await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
+        return
+
+    active_shifts = get_all_active_shifts()
+    if not active_shifts:
+        await interaction.followup.send("⚠️ **Nu există nicio tură activă în acest moment!**", ephemeral=True)
+        return
+
+    numar_mecanici = len(active_shifts)
+
+    if fara_salvare:
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM active_shifts")
+        conn.commit()
+        conn.close()
+        await interaction.followup.send(f"🚫 **Toate pontajele au fost anulate!** Au fost oprite turele pentru **{numar_mecanici} mecanici** FĂRĂ salvarea orelor.", ephemeral=True)
+    else:
+        users = list(active_shifts.keys())
+        for user_id in users:
+            stop_pontaj_user(user_id)
+        await interaction.followup.send(f"🔴 **Toate pontajele au fost oprite!** Au fost închise turele pentru **{numar_mecanici} mecanici** și orele au fost salvate cu succes.", ephemeral=True)
 
 @bot.tree.command(name="reset_pontaje", description="Resetează toate pontajele din baza de date")
 async def reset_pontaje(interaction: discord.Interaction):
