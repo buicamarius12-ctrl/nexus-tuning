@@ -4,7 +4,7 @@ from discord.ext import commands
 from database import init_db, get_total_pontaje_per_user, get_user_total_pontaj, reset_all_pontaje, stop_pontaj, cancel_active_pontaj
 from views import PontajView
 
-TOKEN ="MTUzMzY0MDc0NDkwNzE4MjE0MQ.GFMq1k.9tl9yp2V7pVyiJj2BEDEMA68M1ZizUgcAbrdoA"
+TOKEN ="MTUzMzY0MDc0NDkwNzE4MjE0MQ.GwigOl.9_W2MK_5Aa9Ga8jpZ8V_dl_10935tj_K_VBkqQ"
 
 
 ID_GRAD_RESET =1533708951055761438
