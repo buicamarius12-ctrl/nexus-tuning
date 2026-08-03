@@ -1,4 +1,5 @@
 import os
+import sqlite3
 import threading
 from datetime import datetime
 from flask import Flask
@@ -8,43 +9,111 @@ from discord.ext import commands
 # Numele rolului permis
 ROL_PERMIS = "pontaje"
 
-# --- 1. BAZĂ DE DATE SIMPLĂ ÎN MEMORIE PENTRU PONTAJ ---
-active_shifts = {}  # {user_id: start_time}
-user_hours = {}     # {user_id: total_seconds}
+# --- 1. BAZĂ DE DATE SQLITE (STABILĂ) ---
+DB_FILE = "pontaj.db"
+
+def init_db():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    # Tabel pentru ture active
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS active_shifts (
+            user_id INTEGER PRIMARY KEY,
+            start_time TEXT
+        )
+    ''')
+    # Tabel pentru ore acumulate (in secunde)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS user_hours (
+            user_id INTEGER PRIMARY KEY,
+            total_seconds INTEGER DEFAULT 0
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
 
 def start_pontaj_user(user_id):
-    if user_id in active_shifts:
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT start_time FROM active_shifts WHERE user_id = ?", (user_id,))
+    if cursor.fetchone():
+        conn.close()
         raise Exception("Ești deja în tură! Ieși mai întâi din tura curentă.")
-    active_shifts[user_id] = datetime.now()
+    
+    now_str = datetime.now().isoformat()
+    cursor.execute("INSERT INTO active_shifts (user_id, start_time) VALUES (?, ?)", (user_id, now_str))
+    conn.commit()
+    conn.close()
 
 def stop_pontaj_user(user_id):
-    if user_id not in active_shifts:
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT start_time FROM active_shifts WHERE user_id = ?", (user_id,))
+    row = cursor.fetchone()
+    
+    if not row:
+        conn.close()
         return None, None
     
-    start_time = active_shifts.pop(user_id)
+    start_time = datetime.fromisoformat(row[0])
     duration = datetime.now() - start_time
     seconds_worked = int(duration.total_seconds())
     
-    user_hours[user_id] = user_hours.get(user_id, 0) + seconds_worked
+    cursor.execute("DELETE FROM active_shifts WHERE user_id = ?", (user_id,))
+    cursor.execute("INSERT INTO user_hours (user_id, total_seconds) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET total_seconds = total_seconds + ?", (user_id, seconds_worked, seconds_worked))
+    
+    conn.commit()
+    conn.close()
     
     hours = seconds_worked // 3600
     minutes = (seconds_worked % 3600) // 60
     return hours, minutes
 
 def get_ore_user(user_id):
-    total_seconds = user_hours.get(user_id, 0)
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
     
-    if user_id in active_shifts:
-        current_duration = datetime.now() - active_shifts[user_id]
+    cursor.execute("SELECT total_seconds FROM user_hours WHERE user_id = ?", (user_id,))
+    row_hours = cursor.fetchone()
+    total_seconds = row_hours[0] if row_hours else 0
+    
+    cursor.execute("SELECT start_time FROM active_shifts WHERE user_id = ?", (user_id,))
+    row_shift = cursor.fetchone()
+    if row_shift:
+        start_time = datetime.fromisoformat(row_shift[0])
+        current_duration = datetime.now() - start_time
         total_seconds += int(current_duration.total_seconds())
         
+    conn.close()
     hours = total_seconds // 3600
     minutes = (total_seconds % 3600) // 60
     return hours, minutes
 
 def reset_all_pontaje():
-    active_shifts.clear()
-    user_hours.clear()
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM active_shifts")
+    cursor.execute("DELETE FROM user_hours")
+    conn.commit()
+    conn.close()
+
+def get_all_active_shifts():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id, start_time FROM active_shifts")
+    rows = cursor.fetchall()
+    conn.close()
+    return {row[0]: datetime.fromisoformat(row[1]) for row in rows}
+
+def get_all_users_with_records():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id FROM user_hours UNION SELECT user_id FROM active_shifts")
+    rows = cursor.fetchall()
+    conn.close()
+    return [row[0] for row in rows]
 
 # Funcție helper pentru verificarea rolului
 def are_rolul_permis(interaction: discord.Interaction) -> bool:
@@ -136,7 +205,6 @@ async def setup_pontaj(interaction: discord.Interaction):
     )
     embed.set_footer(text="Nexus Tuning • Keep tuning, keep driving! 🛠️")
     
-    # Trimitem panoul public direct ca răspuns la comandă
     await interaction.response.send_message(embed=embed, view=PontajView())
 
 @bot.tree.command(name="pontaje", description="Trimite lista cu orele totale ale mecanicilor în privat (DM)")
@@ -146,7 +214,8 @@ async def pontaje(interaction: discord.Interaction):
         await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
         return
     
-    all_users = set(user_hours.keys()).union(set(active_shifts.keys()))
+    all_users = get_all_users_with_records()
+    active_shifts = get_all_active_shifts()
     
     if not all_users:
         await interaction.followup.send("📋 **Nu există niciun pontaj înregistrat momentan!**", ephemeral=True)
@@ -180,6 +249,7 @@ async def ture_active(interaction: discord.Interaction):
         await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
         return
     
+    active_shifts = get_all_active_shifts()
     if not active_shifts:
         await interaction.followup.send("🟢 **În acest moment NU există niciun mecanic în tură!**", ephemeral=True)
         return
@@ -217,6 +287,7 @@ async def stop_pontaj_user_cmd(interaction: discord.Interaction, user: discord.M
         await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
         return
     
+    active_shifts = get_all_active_shifts()
     if user.id not in active_shifts:
         await interaction.followup.send(f"⚠️ {user.mention} nu este în tură în acest moment.", ephemeral=True)
         return
@@ -225,7 +296,11 @@ async def stop_pontaj_user_cmd(interaction: discord.Interaction, user: discord.M
         ore, minute = stop_pontaj_user(user.id)
         await interaction.followup.send(f"🔴 **Pontaj oprit forțat!** I s-a oprit tura lui {user.mention}. I s-au salvat **{ore}h și {minute}m**.", ephemeral=True)
     else:
-        active_shifts.pop(user.id, None)
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM active_shifts WHERE user_id = ?", (user.id,))
+        conn.commit()
+        conn.close()
         await interaction.followup.send(f"🚫 **Pontaj anulat complet!** Tura activă a lui {user.mention} a fost ștearsă fără salvare.", ephemeral=True)
 
 @bot.tree.command(name="reset_pontaje", description="Resetează toate pontajele din baza de date")
