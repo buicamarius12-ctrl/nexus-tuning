@@ -15,14 +15,12 @@ DB_FILE = "pontaj.db"
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    # Tabel pentru ture active
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS active_shifts (
             user_id INTEGER PRIMARY KEY,
             start_time TEXT
         )
     ''')
-    # Tabel pentru ore acumulate (in secunde)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS user_hours (
             user_id INTEGER PRIMARY KEY,
@@ -115,7 +113,6 @@ def get_all_users_with_records():
     conn.close()
     return [row[0] for row in rows]
 
-# Funcție helper pentru verificarea rolului
 def are_rolul_permis(interaction: discord.Interaction) -> bool:
     if not isinstance(interaction.user, discord.Member):
         return False
@@ -188,8 +185,9 @@ async def on_ready():
 
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
 async def setup_pontaj(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=True)
     if not are_rolul_permis(interaction):
-        await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
+        await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
         return
 
     embed = discord.Embed(
@@ -205,7 +203,9 @@ async def setup_pontaj(interaction: discord.Interaction):
     )
     embed.set_footer(text="Nexus Tuning • Keep tuning, keep driving! 🛠️")
     
-    await interaction.response.send_message(embed=embed, view=PontajView())
+    # Trimitem pe canal mesajul public cu panoul
+    await interaction.channel.send(embed=embed, view=PontajView())
+    await interaction.followup.send("✅ Panoul a fost postat pe canal cu succes!", ephemeral=True)
 
 @bot.tree.command(name="pontaje", description="Trimite lista cu orele totale ale mecanicilor în privat (DM)")
 async def pontaje(interaction: discord.Interaction):
