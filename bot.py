@@ -173,12 +173,16 @@ class PontajView(discord.ui.View):
 @bot.event
 async def on_ready():
     bot.add_view(PontajView())
+    try:
+        await bot.tree.sync()
+        print("✅ Comenzi slash sincronizate global!")
+    except Exception as e:
+        print(f"❌ Eroare sync comenzi: {e}")
     print(f"🤖 Bot conectat ca {bot.user}")
 
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
 async def setup_pontaj(interaction: discord.Interaction):
-    await interaction.response.defer(ephemeral=False)
-    
+    await interaction.response.defer(ephemeral=True)
     if not are_rolul_permis(interaction):
         await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}`.", ephemeral=True)
         return
