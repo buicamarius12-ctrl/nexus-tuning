@@ -220,6 +220,7 @@ def get_all_users_with_records():
 # =========================================================
 
 def are_rolul_permis(interaction: discord.Interaction) -> bool:
+
     if not hasattr(interaction.user, "roles"):
         return False
 
@@ -263,6 +264,10 @@ threading.Thread(
 
 intents = discord.Intents.default()
 
+# NECESARE PENTRU CONFIGURAȚIA BOTULUI
+intents.message_content = True
+intents.members = True
+
 bot = commands.Bot(
     command_prefix="!",
     intents=intents
@@ -278,10 +283,6 @@ class PontajView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
 
-    # -----------------------------------------------------
-    # INTRA IN TURA
-    # -----------------------------------------------------
-
     @discord.ui.button(
         label="Intra In Tura",
         style=discord.ButtonStyle.green,
@@ -292,9 +293,13 @@ class PontajView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        await interaction.response.defer(ephemeral=True)
+
+        await interaction.response.defer(
+            ephemeral=True
+        )
 
         try:
+
             if not are_rolul_permis(interaction):
                 await interaction.followup.send(
                     f"⚠️ **Acces interzis!**\n"
@@ -303,7 +308,9 @@ class PontajView(discord.ui.View):
                 )
                 return
 
-            start_pontaj_user(interaction.user.id)
+            start_pontaj_user(
+                interaction.user.id
+            )
 
             await interaction.followup.send(
                 "🟢 **Ai intrat în tură cu succes!**\n"
@@ -312,14 +319,11 @@ class PontajView(discord.ui.View):
             )
 
         except Exception as e:
+
             await interaction.followup.send(
                 f"⚠️ **Notificare:** {e}",
                 ephemeral=True
             )
-
-    # -----------------------------------------------------
-    # IESI DIN TURA
-    # -----------------------------------------------------
 
     @discord.ui.button(
         label="Iesi Din Tura",
@@ -331,9 +335,13 @@ class PontajView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        await interaction.response.defer(ephemeral=True)
+
+        await interaction.response.defer(
+            ephemeral=True
+        )
 
         try:
+
             if not are_rolul_permis(interaction):
                 await interaction.followup.send(
                     f"⚠️ **Acces interzis!**\n"
@@ -347,27 +355,27 @@ class PontajView(discord.ui.View):
             )
 
             if ore is not None:
+
                 await interaction.followup.send(
                     f"🔴 **Ai ieșit din tură!**\n"
                     f"Ai lucrat **{ore}h și {minute}m** "
                     f"în această tură.",
                     ephemeral=True
                 )
+
             else:
+
                 await interaction.followup.send(
                     "⚠️ Nu ești înregistrat ca fiind în tură!",
                     ephemeral=True
                 )
 
         except Exception as e:
+
             await interaction.followup.send(
                 f"⚠️ **Notificare:** {e}",
                 ephemeral=True
             )
-
-    # -----------------------------------------------------
-    # VEZI ORELE
-    # -----------------------------------------------------
 
     @discord.ui.button(
         label="Vezi Orele Tale",
@@ -379,9 +387,13 @@ class PontajView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button
     ):
-        await interaction.response.defer(ephemeral=True)
+
+        await interaction.response.defer(
+            ephemeral=True
+        )
 
         try:
+
             if not are_rolul_permis(interaction):
                 await interaction.followup.send(
                     f"⚠️ **Acces interzis!**\n"
@@ -401,6 +413,7 @@ class PontajView(discord.ui.View):
             )
 
         except Exception as e:
+
             await interaction.followup.send(
                 f"⚠️ **Eroare:** {e}",
                 ephemeral=True
@@ -411,8 +424,13 @@ class PontajView(discord.ui.View):
 # BOT READY
 # =========================================================
 
+view_loaded = False
+
+
 @bot.event
 async def on_ready():
+
+    global view_loaded
 
     print("")
     print("========================================")
@@ -422,17 +440,33 @@ async def on_ready():
     print(f"🌐 Servere: {len(bot.guilds)}")
     print("========================================")
 
-    try:
-        bot.add_view(PontajView())
-        print("✅ Panoul persistent a fost încărcat.")
-    except Exception as e:
-        print(f"❌ Eroare la încărcarea panoului: {e}")
+    if not view_loaded:
 
-    # Sincronizare comenzi pe fiecare server
-    for guild in bot.guilds:
         try:
-            bot.tree.copy_global_to(guild=guild)
-            await bot.tree.sync(guild=guild)
+            bot.add_view(PontajView())
+            view_loaded = True
+
+            print(
+                "✅ Panoul persistent a fost încărcat."
+            )
+
+        except Exception as e:
+
+            print(
+                f"❌ Eroare la încărcarea panoului: {e}"
+            )
+
+    for guild in bot.guilds:
+
+        try:
+
+            bot.tree.copy_global_to(
+                guild=guild
+            )
+
+            await bot.tree.sync(
+                guild=guild
+            )
 
             print(
                 f"✅ Comenzi sincronizate pe serverul: "
@@ -440,20 +474,26 @@ async def on_ready():
             )
 
         except Exception as e:
+
             print(
-                f"❌ Eroare sync pe {guild.name}: {e}"
+                f"❌ Eroare sync pe "
+                f"{guild.name}: {e}"
             )
 
+    print("")
+    print("========================================")
     print("✅ BOTUL ESTE GATA DE FOLOSIRE!")
+    print("========================================")
     print("")
 
 
 # =========================================================
-# EVENT ERORI
+# ERORI / CONEXIUNE
 # =========================================================
 
 @bot.event
 async def on_error(event, *args, **kwargs):
+
     print(
         f"❌ Eroare Discord în event-ul: {event}",
         exc_info=True
@@ -462,12 +502,18 @@ async def on_error(event, *args, **kwargs):
 
 @bot.event
 async def on_disconnect():
-    print("⚠️ Botul Discord s-a deconectat!")
+
+    print(
+        "⚠️ Botul Discord s-a deconectat!"
+    )
 
 
 @bot.event
 async def on_resumed():
-    print("🔄 Conexiunea Discord a fost reluată!")
+
+    print(
+        "🔄 Conexiunea Discord a fost reluată!"
+    )
 
 
 # =========================================================
@@ -481,18 +527,25 @@ async def on_resumed():
 async def setup_pontaj(
     interaction: discord.Interaction
 ):
-    await interaction.response.defer(ephemeral=False)
+
+    await interaction.response.defer(
+        ephemeral=False
+    )
 
     if not are_rolul_permis(interaction):
+
         await interaction.followup.send(
             f"⚠️ **Acces interzis!**\n"
             f"Ai nevoie de rolul `{ROL_PERMIS}`.",
             ephemeral=True
         )
+
         return
 
     embed = discord.Embed(
+
         title="🛠️ Nexus Tuning — Pontaj Mecanici",
+
         description=(
             "Bine ai venit în tura ta la "
             "**Nexus Tuning**! 🏎️💨\n\n"
@@ -502,14 +555,15 @@ async def setup_pontaj(
             "petrecut în atelier:\n\n"
 
             "🟢 **Intră în tură** — "
-            "Pornește ceasul când intri în atelier.\n"
+            "Pornește ceasul când intri în atelier.\n\n"
 
             "🔴 **Ieși din tură** — "
-            "Oprește pontajul la finalul programului.\n"
+            "Oprește pontajul la finalul programului.\n\n"
 
             "📊 **Vezi orele tale** — "
             "Verifică totalul de ore lucrate."
         ),
+
         color=discord.Color.teal()
     )
 
@@ -534,25 +588,32 @@ async def setup_pontaj(
 async def pontaje(
     interaction: discord.Interaction
 ):
-    await interaction.response.defer(ephemeral=True)
+
+    await interaction.response.defer(
+        ephemeral=True
+    )
 
     if not are_rolul_permis(interaction):
+
         await interaction.followup.send(
             f"⚠️ **Acces interzis!**\n"
             f"Ai nevoie de rolul `{ROL_PERMIS}`.",
             ephemeral=True
         )
+
         return
 
     all_users = get_all_users_with_records()
     active_shifts = get_all_active_shifts()
 
     if not all_users:
+
         await interaction.followup.send(
             "📋 **Nu există niciun pontaj "
             "înregistrat momentan!**",
             ephemeral=True
         )
+
         return
 
     embed = discord.Embed(
@@ -563,7 +624,10 @@ async def pontaje(
     lista_text = ""
 
     for user_id in all_users:
-        ore, minute = get_ore_user(user_id)
+
+        ore, minute = get_ore_user(
+            user_id
+        )
 
         status = (
             "🟢 în tură"
@@ -587,7 +651,10 @@ async def pontaje(
     )
 
     try:
-        await interaction.user.send(embed=embed)
+
+        await interaction.user.send(
+            embed=embed
+        )
 
         await interaction.followup.send(
             "📩 **Lista ți-a fost trimisă în privat (DM)!**",
@@ -595,6 +662,7 @@ async def pontaje(
         )
 
     except discord.Forbidden:
+
         await interaction.followup.send(
             "⚠️ Deschide mesajele private (DM) "
             "din setările Discord!",
@@ -613,24 +681,31 @@ async def pontaje(
 async def ture_active(
     interaction: discord.Interaction
 ):
-    await interaction.response.defer(ephemeral=True)
+
+    await interaction.response.defer(
+        ephemeral=True
+    )
 
     if not are_rolul_permis(interaction):
+
         await interaction.followup.send(
             f"⚠️ **Acces interzis!**\n"
             f"Ai nevoie de rolul `{ROL_PERMIS}`.",
             ephemeral=True
         )
+
         return
 
     active_shifts = get_all_active_shifts()
 
     if not active_shifts:
+
         await interaction.followup.send(
             "🔴 **Nu există niciun mecanic "
             "în tură în acest moment!**",
             ephemeral=True
         )
+
         return
 
     embed = discord.Embed(
@@ -643,7 +718,11 @@ async def ture_active(
     for user_id, start_time in active_shifts.items():
 
         duration = datetime.now() - start_time
-        sec = max(0, int(duration.total_seconds()))
+
+        sec = max(
+            0,
+            int(duration.total_seconds())
+        )
 
         h = sec // 3600
         m = (sec % 3600) // 60
@@ -663,7 +742,10 @@ async def ture_active(
     )
 
     try:
-        await interaction.user.send(embed=embed)
+
+        await interaction.user.send(
+            embed=embed
+        )
 
         await interaction.followup.send(
             "📩 **Lista mecanicilor activi "
@@ -672,6 +754,7 @@ async def ture_active(
         )
 
     except discord.Forbidden:
+
         await interaction.followup.send(
             "⚠️ Deschide mesajele private (DM) "
             "din setările Discord!",
@@ -690,14 +773,19 @@ async def ture_active(
 async def reset_pontaje(
     interaction: discord.Interaction
 ):
-    await interaction.response.defer(ephemeral=True)
+
+    await interaction.response.defer(
+        ephemeral=True
+    )
 
     if not are_rolul_permis(interaction):
+
         await interaction.followup.send(
             f"⚠️ **Acces interzis!**\n"
             f"Ai nevoie de rolul `{ROL_PERMIS}`.",
             ephemeral=True
         )
+
         return
 
     reset_all_pontaje()
@@ -710,7 +798,7 @@ async def reset_pontaje(
 
 
 # =========================================================
-# PORNIRE
+# PORNIRE BOT
 # =========================================================
 
 if __name__ == "__main__":
