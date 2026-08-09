@@ -173,21 +173,16 @@ class PontajView(discord.ui.View):
 @bot.event
 async def on_ready():
     bot.add_view(PontajView())
-    try:
-        await bot.tree.sync()
-        print("✅ Comenzi slash sincronizate global!")
-    except Exception as e:
-        print(f"❌ Eroare sync comenzi: {e}")
     print(f"🤖 Bot conectat ca {bot.user}")
 
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
 async def setup_pontaj(interaction: discord.Interaction):
+    await interaction.response.defer(ephemeral=False)
+    
     if not are_rolul_permis(interaction):
-        # Dacă nu are rolul, îi trimitem mesaj doar lui (ephemeral)
-        await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}`.", ephemeral=True)
+        await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}`.", ephemeral=True)
         return
 
-    # Dacă are rolul, trimitem mesajul PUBLIC pe canal ca să-l vadă toată lumea
     embed = discord.Embed(
         title="🛠️ Nexus Tuning — Pontaj Mecanici",
         description=(
@@ -200,9 +195,7 @@ async def setup_pontaj(interaction: discord.Interaction):
         color=discord.Color.teal()
     )
     embed.set_footer(text="Nexus Tuning • Keep tuning, keep driving! 🛠️")
-    
-    # Răspundem la interacțiune public pe canal
-    await interaction.response.send_message(embed=embed, view=PontajView())
+    await interaction.followup.send(embed=embed, view=PontajView())
 
 @bot.tree.command(name="pontaje", description="Trimite lista cu orele totale ale mecanicilor în privat (DM)")
 async def pontaje(interaction: discord.Interaction):
