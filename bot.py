@@ -116,15 +116,19 @@ def are_rolul_permis(interaction: discord.Interaction) -> bool:
     return any(role.name.lower() == ROL_PERMIS.lower() for role in interaction.user.roles)
 
 # --- SERVER WEB PENTRU KEEP-ALIVE ---
-app = Flask('')
+app = Flask(__name__)
 
 @app.route('/', methods=['GET', 'HEAD'])
 def home():
     return 'Botul Nexus Tuning este online!'
 
 def run_flask():
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port)
+    port = int(os.environ.get('PORT', 10000))
+    try:
+        from werkzeug.serving import run_simple
+        run_simple('0.0.0.0', port, app)
+    except Exception as e:
+        print(f"Eroare pornire Flask: {e}")
 
 threading.Thread(target=run_flask, daemon=True).start()
 
