@@ -175,9 +175,9 @@ async def on_ready():
     bot.add_view(PontajView())
     try:
         await bot.tree.sync()
-        print("✅ Comenzi sincronizate!")
+        print("✅ Comenzi slash sincronizate cu succes!")
     except Exception as e:
-        print(f"❌ Eroare sync: {e}")
+        print(f"❌ Eroare sync comenzi: {e}")
     print(f"🤖 Bot conectat ca {bot.user}")
 
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
@@ -256,7 +256,7 @@ async def ture_active(interaction: discord.Interaction):
     except discord.Forbidden:
         await interaction.followup.send("⚠️ Deschide mesajele private (DM) din setările Discord!", ephemeral=True)
 
-@bot.tree.command(name="reset_pontaje", description="Resetează toate orele și turele (Doar pentru rolul permis)")
+@bot.tree.command(name="reset_pontaje", description="Resetează toate orele și turele")
 async def reset_pontaje(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     if not are_rolul_permis(interaction):
