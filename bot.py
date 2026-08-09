@@ -502,6 +502,7 @@ class PontajView(discord.ui.View):
 # =========================================================
 
 view_loaded = False
+sync_done = False
 
 
 # =========================================================
@@ -524,7 +525,7 @@ async def on_connect():
 @bot.event
 async def on_ready():
 
-    global view_loaded
+    global view_loaded, sync_done
 
     print(
         "",
@@ -591,43 +592,57 @@ async def on_ready():
             traceback.print_exc()
 
     # -----------------------------------------------------
-    # SYNC COMMANDS
+    # SYNC COMMANDS - O SINGURĂ DATĂ
+    # Evită sincronizări repetate la reconnect, care pot
+    # produce rate-limit (429).
     # -----------------------------------------------------
 
-    for guild in bot.guilds:
+    if not sync_done:
 
-        try:
+        for guild in bot.guilds:
 
-            print(
-                f"🔄 Sincronizez comenzile "
-                f"pe: {guild.name}",
-                flush=True
-            )
+            try:
 
-            bot.tree.copy_global_to(
-                guild=guild
-            )
+                print(
+                    f"🔄 Sincronizez comenzile "
+                    f"pe: {guild.name}",
+                    flush=True
+                )
 
-            synced = await bot.tree.sync(
-                guild=guild
-            )
+                bot.tree.copy_global_to(
+                    guild=guild
+                )
 
-            print(
-                f"✅ {len(synced)} comenzi "
-                f"sincronizate pe "
-                f"{guild.name}",
-                flush=True
-            )
+                synced = await bot.tree.sync(
+                    guild=guild
+                )
 
-        except Exception as e:
+                print(
+                    f"✅ {len(synced)} comenzi "
+                    f"sincronizate pe "
+                    f"{guild.name}",
+                    flush=True
+                )
 
-            print(
-                f"❌ Eroare sync pe "
-                f"{guild.name}: {e}",
-                flush=True
-            )
+            except Exception as e:
 
-            traceback.print_exc()
+                print(
+                    f"❌ Eroare sync pe "
+                    f"{guild.name}: {e}",
+                    flush=True
+                )
+
+                traceback.print_exc()
+
+        sync_done = True
+
+    else:
+
+        print(
+            "ℹ️ Comenzile sunt deja sincronizate; "
+            "nu mai fac sync la reconnect.",
+            flush=True
+        )
 
     print(
         "",
@@ -1160,6 +1175,10 @@ def main():
 
         traceback.print_exc()
 
+        # Nu lăsăm Render să repornească procesul în buclă.
+        while True:
+            time.sleep(3600)
+
     except discord.PrivilegedIntentsRequired:
 
         print(
@@ -1175,6 +1194,9 @@ def main():
 
         traceback.print_exc()
 
+        while True:
+            time.sleep(3600)
+
     except Exception as e:
 
         print(
@@ -1183,6 +1205,36 @@ def main():
         )
 
         traceback.print_exc()
+
+        # Dacă Discord răspunde cu 429, nu ieșim imediat.
+        # Așteptăm ca rate-limit-ul să expire, evitând un
+        # restart continuu al serviciului Render.
+        if "429" in str(e) or "Too Many Requests" in str(e):
+
+            print(
+                "⏳ Discord a aplicat rate-limit (429). "
+                "Aștept 120 secunde înainte de o nouă încercare.",
+                flush=True
+            )
+
+            time.sleep(120)
+
+            print(
+                "🔄 Repornește serviciul pentru o nouă încercare "
+                "după expirarea rate-limit-ului.",
+                flush=True
+            )
+
+        else:
+
+            print(
+                "🛑 Procesul rămâne pornit pentru a evita "
+                "restarturi repetate în Render.",
+                flush=True
+            )
+
+        while True:
+            time.sleep(3600)
 
     finally:
 
