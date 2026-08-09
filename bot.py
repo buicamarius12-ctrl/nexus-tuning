@@ -123,8 +123,8 @@ def home():
     return 'Botul Nexus Tuning este online!'
 
 def run_flask():
-    port = int(os.environ.get('PORT', 8080))
-    app.run(host='0.0.0.0', port=port, use_reloader=False)
+    port = int(os.environ.get('PORT', 10000))
+    app.run(host='0.0.0.0', port=port)
 
 threading.Thread(target=run_flask, daemon=True).start()
 
@@ -315,3 +315,5 @@ async def reset_pontaje(interaction: discord.Interaction):
 TOKEN = os.environ.get('DISCORD_TOKEN')
 if TOKEN:
     bot.run(TOKEN)
+else:
+    print("❌ Eroare: Variabila DISCORD_TOKEN nu este setată în Render Environment!")
