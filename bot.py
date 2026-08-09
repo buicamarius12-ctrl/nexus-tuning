@@ -232,7 +232,7 @@ async def pontaje(interaction: discord.Interaction):
 async def ture_active(interaction: discord.Interaction):
     await interaction.response.defer(ephemeral=True)
     if not are_rolul_permis(interaction):
-        await interaction.followup.send(f"⚠️ **Acces interzis!** AiROL_PERMIS}`.", ephemeral=True)
+        await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}`.", ephemeral=True)
         return
 
     active_shifts = get_all_active_shifts()
@@ -272,7 +272,6 @@ if __name__ == "__main__":
     
     if not TOKEN:
         print("❌ EROARE CRITICĂ: Variabila DISCORD_TOKEN nu este setată în Render Environment!")
-        # Ținem procesul viu pentru Flask/Render chiar dacă token-ul lipsește
         import time
         while True:
             time.sleep(3600)
