@@ -1,8 +1,6 @@
 import os
 import sqlite3
 import threading
-import time
-import urllib.request
 from datetime import datetime
 from flask import Flask
 import discord
@@ -117,12 +115,12 @@ def are_rolul_permis(interaction: discord.Interaction) -> bool:
         return False
     return any(role.name.lower() == ROL_PERMIS.lower() for role in interaction.user.roles)
 
-# --- SERVER WEB FLASK ---
+# --- SERVER WEB PENTRU KEEP-ALIVE ---
 app = Flask('')
 
-@app.route('/')
+@app.route('/', methods=['GET', 'HEAD'])
 def home():
-    return 'Botul este online!'
+    return 'Botul Nexus Tuning este online!'
 
 def run_flask():
     port = int(os.environ.get('PORT', 8080))
