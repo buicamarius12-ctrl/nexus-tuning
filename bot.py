@@ -2,6 +2,8 @@ import os
 import sqlite3
 import threading
 import time
+import asyncio
+import traceback
 from datetime import datetime
 
 from flask import Flask
@@ -43,17 +45,15 @@ def init_db():
         conn.commit()
         conn.close()
 
-        print("✅ Baza de date a fost inițializată.")
+        print("✅ Baza de date a fost inițializată.", flush=True)
 
     except Exception as e:
-        print(f"❌ Eroare DB: {e}")
-
-
-init_db()
+        print(f"❌ Eroare DB: {e}", flush=True)
+        traceback.print_exc()
 
 
 # =========================================================
-# FUNCȚII PONTAJ
+# PONTAJ
 # =========================================================
 
 def start_pontaj_user(user_id):
@@ -103,7 +103,10 @@ def stop_pontaj_user(user_id):
     start_time = datetime.fromisoformat(row[0])
 
     duration = datetime.now() - start_time
-    seconds_worked = max(0, int(duration.total_seconds()))
+    seconds_worked = max(
+        0,
+        int(duration.total_seconds())
+    )
 
     cursor.execute(
         "DELETE FROM active_shifts WHERE user_id = ?",
@@ -143,7 +146,12 @@ def get_ore_user(user_id):
     )
 
     row_hours = cursor.fetchone()
-    total_seconds = row_hours[0] if row_hours else 0
+
+    total_seconds = (
+        row_hours[0]
+        if row_hours
+        else 0
+    )
 
     cursor.execute(
         "SELECT start_time FROM active_shifts WHERE user_id = ?",
@@ -153,8 +161,13 @@ def get_ore_user(user_id):
     row_shift = cursor.fetchone()
 
     if row_shift:
-        start_time = datetime.fromisoformat(row_shift[0])
-        current_duration = datetime.now() - start_time
+        start_time = datetime.fromisoformat(
+            row_shift[0]
+        )
+
+        current_duration = (
+            datetime.now() - start_time
+        )
 
         total_seconds += max(
             0,
@@ -173,8 +186,13 @@ def reset_all_pontaje():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
 
-    cursor.execute("DELETE FROM active_shifts")
-    cursor.execute("DELETE FROM user_hours")
+    cursor.execute(
+        "DELETE FROM active_shifts"
+    )
+
+    cursor.execute(
+        "DELETE FROM user_hours"
+    )
 
     conn.commit()
     conn.close()
@@ -185,7 +203,10 @@ def get_all_active_shifts():
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT user_id, start_time FROM active_shifts"
+        """
+        SELECT user_id, start_time
+        FROM active_shifts
+        """
     )
 
     rows = cursor.fetchall()
@@ -204,7 +225,9 @@ def get_all_users_with_records():
 
     cursor.execute("""
         SELECT user_id FROM user_hours
+
         UNION
+
         SELECT user_id FROM active_shifts
     """)
 
@@ -212,38 +235,63 @@ def get_all_users_with_records():
 
     conn.close()
 
-    return [row[0] for row in rows]
+    return [
+        row[0]
+        for row in rows
+    ]
 
 
 # =========================================================
 # VERIFICARE ROL
 # =========================================================
 
-def are_rolul_permis(interaction: discord.Interaction) -> bool:
+def are_rolul_permis(
+    interaction: discord.Interaction
+) -> bool:
 
-    if not hasattr(interaction.user, "roles"):
+    if not hasattr(
+        interaction.user,
+        "roles"
+    ):
         return False
 
     return any(
-        role.name.lower() == ROL_PERMIS.lower()
+        role.name.lower()
+        == ROL_PERMIS.lower()
         for role in interaction.user.roles
     )
 
 
 # =========================================================
-# FLASK - RENDER / UPTIMEROBOT
+# FLASK - RENDER
 # =========================================================
 
 app = Flask(__name__)
 
 
-@app.route("/", methods=["GET", "HEAD", "POST"])
+@app.route(
+    "/",
+    methods=["GET", "HEAD", "POST"]
+)
 def home():
-    return "Botul Nexus Tuning este online!", 200
+    return (
+        "Botul Nexus Tuning este online!",
+        200
+    )
 
 
 def run_flask():
-    port = int(os.environ.get("PORT", "10000"))
+    port = int(
+        os.environ.get(
+            "PORT",
+            "10000"
+        )
+    )
+
+    print(
+        f"🌐 Pornesc Flask pe portul {port}...",
+        flush=True
+    )
 
     app.run(
         host="0.0.0.0",
@@ -252,21 +300,26 @@ def run_flask():
     )
 
 
-threading.Thread(
-    target=run_flask,
-    daemon=True
-).start()
-
-
 # =========================================================
-# DISCORD BOT
+# DISCORD INTENTS
 # =========================================================
+
+print(
+    "⚙️ Configurez Discord intents...",
+    flush=True
+)
 
 intents = discord.Intents.default()
 
-# NECESARE PENTRU CONFIGURAȚIA BOTULUI
+# IMPORTANT
 intents.message_content = True
 intents.members = True
+intents.presences = True
+
+
+# =========================================================
+# BOT
+# =========================================================
 
 bot = commands.Bot(
     command_prefix="!",
@@ -275,13 +328,15 @@ bot = commands.Bot(
 
 
 # =========================================================
-# PANOU PONTAJ
+# VIEW PONTAJ
 # =========================================================
 
 class PontajView(discord.ui.View):
 
     def __init__(self):
-        super().__init__(timeout=None)
+        super().__init__(
+            timeout=None
+        )
 
     @discord.ui.button(
         label="Intra In Tura",
@@ -300,12 +355,17 @@ class PontajView(discord.ui.View):
 
         try:
 
-            if not are_rolul_permis(interaction):
+            if not are_rolul_permis(
+                interaction
+            ):
+
                 await interaction.followup.send(
                     f"⚠️ **Acces interzis!**\n"
-                    f"Ai nevoie de rolul `{ROL_PERMIS}`.",
+                    f"Ai nevoie de rolul "
+                    f"`{ROL_PERMIS}`.",
                     ephemeral=True
                 )
+
                 return
 
             start_pontaj_user(
@@ -325,6 +385,7 @@ class PontajView(discord.ui.View):
                 ephemeral=True
             )
 
+
     @discord.ui.button(
         label="Iesi Din Tura",
         style=discord.ButtonStyle.red,
@@ -342,12 +403,17 @@ class PontajView(discord.ui.View):
 
         try:
 
-            if not are_rolul_permis(interaction):
+            if not are_rolul_permis(
+                interaction
+            ):
+
                 await interaction.followup.send(
                     f"⚠️ **Acces interzis!**\n"
-                    f"Ai nevoie de rolul `{ROL_PERMIS}`.",
+                    f"Ai nevoie de rolul "
+                    f"`{ROL_PERMIS}`.",
                     ephemeral=True
                 )
+
                 return
 
             ore, minute = stop_pontaj_user(
@@ -358,7 +424,8 @@ class PontajView(discord.ui.View):
 
                 await interaction.followup.send(
                     f"🔴 **Ai ieșit din tură!**\n"
-                    f"Ai lucrat **{ore}h și {minute}m** "
+                    f"Ai lucrat **{ore}h "
+                    f"și {minute}m** "
                     f"în această tură.",
                     ephemeral=True
                 )
@@ -366,7 +433,8 @@ class PontajView(discord.ui.View):
             else:
 
                 await interaction.followup.send(
-                    "⚠️ Nu ești înregistrat ca fiind în tură!",
+                    "⚠️ Nu ești înregistrat "
+                    "ca fiind în tură!",
                     ephemeral=True
                 )
 
@@ -376,6 +444,7 @@ class PontajView(discord.ui.View):
                 f"⚠️ **Notificare:** {e}",
                 ephemeral=True
             )
+
 
     @discord.ui.button(
         label="Vezi Orele Tale",
@@ -394,21 +463,29 @@ class PontajView(discord.ui.View):
 
         try:
 
-            if not are_rolul_permis(interaction):
+            if not are_rolul_permis(
+                interaction
+            ):
+
                 await interaction.followup.send(
                     f"⚠️ **Acces interzis!**\n"
-                    f"Ai nevoie de rolul `{ROL_PERMIS}`.",
+                    f"Ai nevoie de rolul "
+                    f"`{ROL_PERMIS}`.",
                     ephemeral=True
                 )
+
                 return
 
-            total_ore, total_minute = get_ore_user(
-                interaction.user.id
+            total_ore, total_minute = (
+                get_ore_user(
+                    interaction.user.id
+                )
             )
 
             await interaction.followup.send(
                 f"📊 **Total ore lucrate:** "
-                f"{total_ore}h și {total_minute}m.",
+                f"{total_ore}h "
+                f"și {total_minute}m.",
                 ephemeral=True
             )
 
@@ -421,108 +498,218 @@ class PontajView(discord.ui.View):
 
 
 # =========================================================
-# BOT READY
+# VARIABILE
 # =========================================================
 
 view_loaded = False
 
+
+# =========================================================
+# ON CONNECT
+# =========================================================
+
+@bot.event
+async def on_connect():
+
+    print(
+        "🔌 DISCORD GATEWAY CONECTAT!",
+        flush=True
+    )
+
+
+# =========================================================
+# ON READY
+# =========================================================
 
 @bot.event
 async def on_ready():
 
     global view_loaded
 
-    print("")
-    print("========================================")
-    print("🤖 BOT DISCORD CONECTAT")
-    print(f"👤 Cont: {bot.user}")
-    print(f"🆔 ID: {bot.user.id}")
-    print(f"🌐 Servere: {len(bot.guilds)}")
-    print("========================================")
+    print(
+        "",
+        flush=True
+    )
+
+    print(
+        "========================================",
+        flush=True
+    )
+
+    print(
+        "🤖 BOT DISCORD CONECTAT",
+        flush=True
+    )
+
+    print(
+        f"👤 Cont: {bot.user}",
+        flush=True
+    )
+
+    print(
+        f"🆔 ID: {bot.user.id}",
+        flush=True
+    )
+
+    print(
+        f"🌐 Servere: {len(bot.guilds)}",
+        flush=True
+    )
+
+    print(
+        "========================================",
+        flush=True
+    )
+
+    # -----------------------------------------------------
+    # VIEW
+    # -----------------------------------------------------
 
     if not view_loaded:
 
         try:
-            bot.add_view(PontajView())
+
+            bot.add_view(
+                PontajView()
+            )
+
             view_loaded = True
 
             print(
-                "✅ Panoul persistent a fost încărcat."
+                "✅ Panoul persistent "
+                "a fost încărcat.",
+                flush=True
             )
 
         except Exception as e:
 
             print(
-                f"❌ Eroare la încărcarea panoului: {e}"
+                f"❌ Eroare panou: {e}",
+                flush=True
             )
+
+            traceback.print_exc()
+
+    # -----------------------------------------------------
+    # SYNC COMMANDS
+    # -----------------------------------------------------
 
     for guild in bot.guilds:
 
         try:
 
+            print(
+                f"🔄 Sincronizez comenzile "
+                f"pe: {guild.name}",
+                flush=True
+            )
+
             bot.tree.copy_global_to(
                 guild=guild
             )
 
-            await bot.tree.sync(
+            synced = await bot.tree.sync(
                 guild=guild
             )
 
             print(
-                f"✅ Comenzi sincronizate pe serverul: "
-                f"{guild.name}"
+                f"✅ {len(synced)} comenzi "
+                f"sincronizate pe "
+                f"{guild.name}",
+                flush=True
             )
 
         except Exception as e:
 
             print(
                 f"❌ Eroare sync pe "
-                f"{guild.name}: {e}"
+                f"{guild.name}: {e}",
+                flush=True
             )
 
-    print("")
-    print("========================================")
-    print("✅ BOTUL ESTE GATA DE FOLOSIRE!")
-    print("========================================")
-    print("")
-
-
-# =========================================================
-# ERORI / CONEXIUNE
-# =========================================================
-
-@bot.event
-async def on_error(event, *args, **kwargs):
+            traceback.print_exc()
 
     print(
-        f"❌ Eroare Discord în event-ul: {event}",
-        exc_info=True
+        "",
+        flush=True
     )
 
+    print(
+        "========================================",
+        flush=True
+    )
+
+    print(
+        "✅ BOTUL ESTE GATA DE FOLOSIRE!",
+        flush=True
+    )
+
+    print(
+        "========================================",
+        flush=True
+    )
+
+    print(
+        "",
+        flush=True
+    )
+
+
+# =========================================================
+# DISCONNECT
+# =========================================================
 
 @bot.event
 async def on_disconnect():
 
     print(
-        "⚠️ Botul Discord s-a deconectat!"
+        "⚠️ BOTUL S-A DECONECTAT DE LA DISCORD!",
+        flush=True
     )
 
+
+# =========================================================
+# RESUMED
+# =========================================================
 
 @bot.event
 async def on_resumed():
 
     print(
-        "🔄 Conexiunea Discord a fost reluată!"
+        "🔄 CONEXIUNEA DISCORD A FOST RELUATĂ!",
+        flush=True
     )
 
 
 # =========================================================
-# /setup_pontaj
+# ERORI
+# =========================================================
+
+@bot.event
+async def on_error(
+    event,
+    *args,
+    **kwargs
+):
+
+    print(
+        f"❌ EROARE DISCORD EVENT: {event}",
+        flush=True
+    )
+
+    traceback.print_exc()
+
+
+# =========================================================
+# SETUP PONTAJ
 # =========================================================
 
 @bot.tree.command(
     name="setup_pontaj",
-    description="Trimite panoul principal pentru pontaj mecanici"
+    description=(
+        "Trimite panoul principal "
+        "pentru pontaj mecanici"
+    )
 )
 async def setup_pontaj(
     interaction: discord.Interaction
@@ -532,11 +719,14 @@ async def setup_pontaj(
         ephemeral=False
     )
 
-    if not are_rolul_permis(interaction):
+    if not are_rolul_permis(
+        interaction
+    ):
 
         await interaction.followup.send(
             f"⚠️ **Acces interzis!**\n"
-            f"Ai nevoie de rolul `{ROL_PERMIS}`.",
+            f"Ai nevoie de rolul "
+            f"`{ROL_PERMIS}`.",
             ephemeral=True
         )
 
@@ -544,7 +734,10 @@ async def setup_pontaj(
 
     embed = discord.Embed(
 
-        title="🛠️ Nexus Tuning — Pontaj Mecanici",
+        title=(
+            "🛠️ Nexus Tuning — "
+            "Pontaj Mecanici"
+        ),
 
         description=(
             "Bine ai venit în tura ta la "
@@ -555,20 +748,26 @@ async def setup_pontaj(
             "petrecut în atelier:\n\n"
 
             "🟢 **Intră în tură** — "
-            "Pornește ceasul când intri în atelier.\n\n"
+            "Pornește ceasul când intri "
+            "în atelier.\n\n"
 
             "🔴 **Ieși din tură** — "
-            "Oprește pontajul la finalul programului.\n\n"
+            "Oprește pontajul la finalul "
+            "programului.\n\n"
 
             "📊 **Vezi orele tale** — "
-            "Verifică totalul de ore lucrate."
+            "Verifică totalul de ore "
+            "lucrate."
         ),
 
         color=discord.Color.teal()
     )
 
     embed.set_footer(
-        text="Nexus Tuning • Keep tuning, keep driving! 🛠️"
+        text=(
+            "Nexus Tuning • "
+            "Keep tuning, keep driving! 🛠️"
+        )
     )
 
     await interaction.followup.send(
@@ -578,12 +777,15 @@ async def setup_pontaj(
 
 
 # =========================================================
-# /pontaje
+# PONTAJE
 # =========================================================
 
 @bot.tree.command(
     name="pontaje",
-    description="Trimite lista cu orele totale ale mecanicilor în privat (DM)"
+    description=(
+        "Trimite lista cu orele totale "
+        "ale mecanicilor în privat"
+    )
 )
 async def pontaje(
     interaction: discord.Interaction
@@ -593,18 +795,26 @@ async def pontaje(
         ephemeral=True
     )
 
-    if not are_rolul_permis(interaction):
+    if not are_rolul_permis(
+        interaction
+    ):
 
         await interaction.followup.send(
             f"⚠️ **Acces interzis!**\n"
-            f"Ai nevoie de rolul `{ROL_PERMIS}`.",
+            f"Ai nevoie de rolul "
+            f"`{ROL_PERMIS}`.",
             ephemeral=True
         )
 
         return
 
-    all_users = get_all_users_with_records()
-    active_shifts = get_all_active_shifts()
+    all_users = (
+        get_all_users_with_records()
+    )
+
+    active_shifts = (
+        get_all_active_shifts()
+    )
 
     if not all_users:
 
@@ -617,7 +827,10 @@ async def pontaje(
         return
 
     embed = discord.Embed(
-        title="📋 Istoric Pontaje — Nexus Tuning",
+        title=(
+            "📋 Istoric Pontaje — "
+            "Nexus Tuning"
+        ),
         color=discord.Color.gold()
     )
 
@@ -642,7 +855,11 @@ async def pontaje(
         )
 
     if len(lista_text) > 1024:
-        lista_text = lista_text[:1000] + "\n..."
+
+        lista_text = (
+            lista_text[:1000]
+            + "\n..."
+        )
 
     embed.add_field(
         name="Mecanici Pontați",
@@ -657,26 +874,30 @@ async def pontaje(
         )
 
         await interaction.followup.send(
-            "📩 **Lista ți-a fost trimisă în privat (DM)!**",
+            "📩 **Lista ți-a fost "
+            "trimisă în privat (DM)!**",
             ephemeral=True
         )
 
     except discord.Forbidden:
 
         await interaction.followup.send(
-            "⚠️ Deschide mesajele private (DM) "
-            "din setările Discord!",
+            "⚠️ Deschide mesajele private "
+            "(DM) din setările Discord!",
             ephemeral=True
         )
 
 
 # =========================================================
-# /ture_active
+# TURE ACTIVE
 # =========================================================
 
 @bot.tree.command(
     name="ture_active",
-    description="Trimite lista cu mecanicii aflați ÎN TURĂ ACUM în privat (DM)"
+    description=(
+        "Trimite lista cu mecanicii "
+        "aflați în tură în privat"
+    )
 )
 async def ture_active(
     interaction: discord.Interaction
@@ -686,17 +907,22 @@ async def ture_active(
         ephemeral=True
     )
 
-    if not are_rolul_permis(interaction):
+    if not are_rolul_permis(
+        interaction
+    ):
 
         await interaction.followup.send(
             f"⚠️ **Acces interzis!**\n"
-            f"Ai nevoie de rolul `{ROL_PERMIS}`.",
+            f"Ai nevoie de rolul "
+            f"`{ROL_PERMIS}`.",
             ephemeral=True
         )
 
         return
 
-    active_shifts = get_all_active_shifts()
+    active_shifts = (
+        get_all_active_shifts()
+    )
 
     if not active_shifts:
 
@@ -709,19 +935,29 @@ async def ture_active(
         return
 
     embed = discord.Embed(
-        title="🟢 Mecanici Aflați în Tură Acum",
+        title=(
+            "🟢 Mecanici Aflați "
+            "în Tură Acum"
+        ),
         color=discord.Color.green()
     )
 
     text = ""
 
-    for user_id, start_time in active_shifts.items():
+    for user_id, start_time in (
+        active_shifts.items()
+    ):
 
-        duration = datetime.now() - start_time
+        duration = (
+            datetime.now()
+            - start_time
+        )
 
         sec = max(
             0,
-            int(duration.total_seconds())
+            int(
+                duration.total_seconds()
+            )
         )
 
         h = sec // 3600
@@ -729,11 +965,16 @@ async def ture_active(
 
         text += (
             f"• <@{user_id}> — "
-            f"în tură de **{h}h {m}m**\n"
+            f"în tură de "
+            f"**{h}h {m}m**\n"
         )
 
     if len(text) > 1024:
-        text = text[:1000] + "\n..."
+
+        text = (
+            text[:1000]
+            + "\n..."
+        )
 
     embed.add_field(
         name="Mecanici Activi",
@@ -749,26 +990,28 @@ async def ture_active(
 
         await interaction.followup.send(
             "📩 **Lista mecanicilor activi "
-            "ți-a fost trimisă în privat (DM)!**",
+            "ți-a fost trimisă în privat!**",
             ephemeral=True
         )
 
     except discord.Forbidden:
 
         await interaction.followup.send(
-            "⚠️ Deschide mesajele private (DM) "
-            "din setările Discord!",
+            "⚠️ Deschide mesajele private "
+            "(DM) din setările Discord!",
             ephemeral=True
         )
 
 
 # =========================================================
-# /reset_pontaje
+# RESET
 # =========================================================
 
 @bot.tree.command(
     name="reset_pontaje",
-    description="Resetează toate orele și turele"
+    description=(
+        "Resetează toate orele și turele"
+    )
 )
 async def reset_pontaje(
     interaction: discord.Interaction
@@ -778,11 +1021,14 @@ async def reset_pontaje(
         ephemeral=True
     )
 
-    if not are_rolul_permis(interaction):
+    if not are_rolul_permis(
+        interaction
+    ):
 
         await interaction.followup.send(
             f"⚠️ **Acces interzis!**\n"
-            f"Ai nevoie de rolul `{ROL_PERMIS}`.",
+            f"Ai nevoie de rolul "
+            f"`{ROL_PERMIS}`.",
             ephemeral=True
         )
 
@@ -798,47 +1044,157 @@ async def reset_pontaje(
 
 
 # =========================================================
-# PORNIRE BOT
+# PORNIRE
 # =========================================================
 
-if __name__ == "__main__":
+def main():
 
-    print("🚀 Pornesc botul Discord...")
+    print(
+        "",
+        flush=True
+    )
 
-    TOKEN = os.environ.get(
-        "DISCORD_TOKEN",
-        ""
-    ).strip()
+    print(
+        "========================================",
+        flush=True
+    )
 
-    if not TOKEN:
+    print(
+        "🚀 PORNESC BOTUL DISCORD...",
+        flush=True
+    )
+
+    print(
+        "========================================",
+        flush=True
+    )
+
+    # -----------------------------------------------------
+    # TOKEN
+    # -----------------------------------------------------
+
+    token = os.environ.get(
+        "DISCORD_TOKEN"
+    )
+
+    if token is None:
 
         print(
-            "❌ EROARE CRITICĂ: "
-            "DISCORD_TOKEN NU ESTE SETAT!"
+            "❌ DISCORD_TOKEN NU EXISTĂ!",
+            flush=True
         )
 
-        while True:
-            time.sleep(3600)
+        return
+
+    token = token.strip()
+
+    if not token:
+
+        print(
+            "❌ DISCORD_TOKEN ESTE GOL!",
+            flush=True
+        )
+
+        return
+
+    print(
+        "🔑 DISCORD_TOKEN a fost găsit.",
+        flush=True
+    )
+
+    print(
+        f"🔑 Lungime token: {len(token)} caractere.",
+        flush=True
+    )
+
+    # -----------------------------------------------------
+    # DATABASE
+    # -----------------------------------------------------
+
+    init_db()
+
+    # -----------------------------------------------------
+    # FLASK
+    # -----------------------------------------------------
+
+    flask_thread = threading.Thread(
+        target=run_flask,
+        daemon=True
+    )
+
+    flask_thread.start()
+
+    print(
+        "🌐 Flask thread pornit.",
+        flush=True
+    )
+
+    # -----------------------------------------------------
+    # DISCORD
+    # -----------------------------------------------------
+
+    print(
+        "🔌 Mă conectez la Discord Gateway...",
+        flush=True
+    )
 
     try:
 
-        bot.run(TOKEN)
+        bot.run(
+            token,
+            reconnect=True
+        )
 
     except discord.LoginFailure:
 
         print(
-            "❌ DISCORD_LOGIN_FAILURE: "
-            "Tokenul Discord este invalid."
+            "❌ DISCORD LOGIN FAILURE!",
+            flush=True
         )
 
-        while True:
-            time.sleep(3600)
+        print(
+            "❌ Tokenul Discord este invalid "
+            "sau a fost regenerat.",
+            flush=True
+        )
+
+        traceback.print_exc()
+
+    except discord.PrivilegedIntentsRequired:
+
+        print(
+            "❌ PRIVILEGED INTENTS REQUIRED!",
+            flush=True
+        )
+
+        print(
+            "❌ Verifică Message Content Intent "
+            "și Server Members Intent.",
+            flush=True
+        )
+
+        traceback.print_exc()
 
     except Exception as e:
 
         print(
-            f"❌ EROARE LA PORNIREA BOTULUI: {e}"
+            f"❌ EROARE BOT: {e}",
+            flush=True
         )
 
-        while True:
-            time.sleep(3600)
+        traceback.print_exc()
+
+    finally:
+
+        print(
+            "🛑 bot.run() s-a încheiat.",
+            flush=True
+        )
+
+
+# =========================================================
+# START
+# =========================================================
+
+if __name__ == "__main__":
+    main()
