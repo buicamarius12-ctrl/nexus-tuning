@@ -175,7 +175,7 @@ async def on_ready():
     bot.add_view(PontajView())
     try:
         await bot.tree.sync()
-        print("✅ Comenzi slash sincronizate cu succes!")
+        print("✅ Comenzi slash sincronizate global!")
     except Exception as e:
         print(f"❌ Eroare sync comenzi: {e}")
     print(f"🤖 Bot conectat ca {bot.user}")
