@@ -115,7 +115,7 @@ def get_all_users_with_records():
     return [row[0] for row in rows]
 
 def are_rolul_permis(interaction: discord.Interaction) -> bool:
-    if not isinstance(interaction.user, discord.Member):
+    if not hasattr(interaction.user, "roles"):
         return False
     return any(role.name.lower() == ROL_PERMIS.lower() for role in interaction.user.roles)
 
@@ -130,12 +130,12 @@ def run_flask():
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port, use_reloader=False)
 
-# Pornim Flask pe un fir de execuție separat
 threading.Thread(target=run_flask, daemon=True).start()
 
 # --- DISCORD BOT CONFIG ---
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
@@ -182,8 +182,9 @@ async def on_ready():
 
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
 async def setup_pontaj(interaction: discord.Interaction):
+    await interaction.response.defer()
     if not are_rolul_permis(interaction):
-        await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}`.", ephemeral=True)
+        await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}`.", ephemeral=True)
         return
 
     embed = discord.Embed(
@@ -198,7 +199,7 @@ async def setup_pontaj(interaction: discord.Interaction):
         color=discord.Color.teal()
     )
     embed.set_footer(text="Nexus Tuning • Keep tuning, keep driving! 🛠️")
-    await interaction.response.send_message(embed=embed, view=PontajView())
+    await interaction.followup.send(embed=embed, view=PontajView())
 
 @bot.tree.command(name="pontaje", description="Trimite lista cu orele totale ale mecanicilor în privat (DM)")
 async def pontaje(interaction: discord.Interaction):
@@ -266,7 +267,6 @@ async def reset_pontaje(interaction: discord.Interaction):
     reset_all_pontaje()
     await interaction.followup.send("🧹 **Toate pontajele și orele au fost resetate cu succes!**", ephemeral=True)
 
-# --- EXECUȚIE DE SIGURANȚĂ ---
 if __name__ == "__main__":
     TOKEN = os.environ.get('DISCORD_TOKEN', '').strip()
     
@@ -283,3 +283,4 @@ if __name__ == "__main__":
             import time
             while True:
                 time.sleep(3600)
+            
