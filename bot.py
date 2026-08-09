@@ -1,15 +1,17 @@
 import os
 import sqlite3
 import threading
+import time
+import urllib.request
 from datetime import datetime
 from flask import Flask
 import discord
 from discord.ext import commands
 
-# Numele rolului permis
+# Numele rolului permis pentru comenzi administrative
 ROL_PERMIS = "pontaje"
 
-# --- 1. BAZĂ DE DATE SQLITE (STABILĂ) ---
+# --- 1. BAZĂ DE DATE SQLITE ---
 DB_FILE = "pontaj.db"
 
 def init_db():
@@ -118,7 +120,7 @@ def are_rolul_permis(interaction: discord.Interaction) -> bool:
         return False
     return any(role.name.lower() == ROL_PERMIS.lower() for role in interaction.user.roles)
 
-# --- 2. SERVER WEB PENTRU KEEP-ALIVE PE RENDER ---
+# --- 2. SERVER WEB PENTRU KEEP-ALIVE ---
 app = Flask('')
 
 @app.route('/')
@@ -131,13 +133,27 @@ def run_flask():
 
 threading.Thread(target=run_flask, daemon=True).start()
 
-# --- 3. CONFIGURARE BOT DISCORD ---
+# --- 3. AUTO-PING ---
+def self_ping():
+    render_url = os.environ.get('RENDER_EXTERNAL_URL')
+    if render_url:
+        while True:
+            time.sleep(600)
+            try:
+                urllib.request.urlopen(render_url)
+                print("🔄 Auto-ping efectuat cu succes!")
+            except Exception as e:
+                print(f"⚠️ Eroare la auto-ping: {e}")
+
+threading.Thread(target=self_ping, daemon=True).start()
+
+# --- 4. CONFIGURARE BOT DISCORD ---
 intents = discord.Intents.default()
 intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# --- 4. PANOU CU BUTOANE ---
+# --- 5. PANOU CU BUTOANE ---
 class PontajView(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
@@ -169,7 +185,7 @@ class PontajView(discord.ui.View):
         total_ore, total_minute = get_ore_user(interaction.user.id)
         await interaction.followup.send(f"📊 **Total ore lucrate:** {total_ore}h și {total_minute}m.", ephemeral=True)
 
-# --- 5. EVENIMENT LA PORNIRE ---
+# --- 6. EVENIMENT LA PORNIRE ---
 @bot.event
 async def on_ready():
     bot.add_view(PontajView())
@@ -181,11 +197,11 @@ async def on_ready():
 
     print(f"🤖 Botul este online și conectat ca {bot.user}!")
 
-# --- 6. COMENZI SLASH ---
+# --- 7. COMENZI SLASH ---
 
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
 async def setup_pontaj(interaction: discord.Interaction):
-    # Răspundem instantaneu către Discord că comanda se procesează!
+    # PRIMUL PAS CRITIC: Preluăm comanda imediat pentru a preveni "Aplicația nu a răspuns / Pontaj Bot nu a răspuns la timp"
     await interaction.response.defer()
 
     if not are_rolul_permis(interaction):
@@ -340,7 +356,7 @@ async def reset_pontaje(interaction: discord.Interaction):
     reset_all_pontaje()
     await interaction.followup.send("🧹 **Toate pontajele au fost șterse cu succes!**", ephemeral=True)
 
-# --- 7. PORNIRE BOT ---
+# --- 8. PORNIRE BOT ---
 TOKEN = os.environ.get('DISCORD_TOKEN')
 
 if TOKEN:
