@@ -182,9 +182,8 @@ async def on_ready():
 
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
 async def setup_pontaj(interaction: discord.Interaction):
-    await interaction.response.defer()
     if not are_rolul_permis(interaction):
-        await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}`.", ephemeral=True)
+        await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}`.", ephemeral=True)
         return
 
     embed = discord.Embed(
@@ -199,7 +198,7 @@ async def setup_pontaj(interaction: discord.Interaction):
         color=discord.Color.teal()
     )
     embed.set_footer(text="Nexus Tuning • Keep tuning, keep driving! 🛠️")
-    await interaction.followup.send(embed=embed, view=PontajView())
+    await interaction.response.send_message(embed=embed, view=PontajView())
 
 @bot.tree.command(name="pontaje", description="Trimite lista cu orele totale ale mecanicilor în privat (DM)")
 async def pontaje(interaction: discord.Interaction):
@@ -283,4 +282,3 @@ if __name__ == "__main__":
             import time
             while True:
                 time.sleep(3600)
-            
