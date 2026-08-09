@@ -138,12 +138,11 @@ def self_ping():
     render_url = os.environ.get('RENDER_EXTERNAL_URL')
     if render_url:
         while True:
-            time.sleep(600)
+            time.sleep(300)
             try:
                 urllib.request.urlopen(render_url)
-                print("🔄 Auto-ping efectuat cu succes!")
-            except Exception as e:
-                print(f"⚠️ Eroare la auto-ping: {e}")
+            except Exception:
+                pass
 
 threading.Thread(target=self_ping, daemon=True).start()
 
@@ -190,22 +189,17 @@ class PontajView(discord.ui.View):
 async def on_ready():
     bot.add_view(PontajView())
     try:
-        synced = await bot.tree.sync()
-        print(f"✅ Sincronizat cu succes {len(synced)} comenzi slash!")
+        await bot.tree.sync()
     except Exception as e:
         print(f"❌ Eroare la sincronizare: {e}")
-
-    print(f"🤖 Botul este online și conectat ca {bot.user}!")
+    print(f"🤖 Botul este online ca {bot.user}!")
 
 # --- 7. COMENZI SLASH ---
 
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
 async def setup_pontaj(interaction: discord.Interaction):
-    # PRIMUL PAS CRITIC: Preluăm comanda imediat pentru a preveni "Aplicația nu a răspuns / Pontaj Bot nu a răspuns la timp"
-    await interaction.response.defer()
-
     if not are_rolul_permis(interaction):
-        await interaction.followup.send(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
+        await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru această comandă.", ephemeral=True)
         return
 
     embed = discord.Embed(
@@ -221,7 +215,8 @@ async def setup_pontaj(interaction: discord.Interaction):
     )
     embed.set_footer(text="Nexus Tuning • Keep tuning, keep driving! 🛠️")
     
-    await interaction.followup.send(embed=embed, view=PontajView())
+    # Răspundem direct folosind send_message în loc de defer/followup pentru atenualizarea latenței de rețea
+    await interaction.response.send_message(embed=embed, view=PontajView())
 
 @bot.tree.command(name="pontaje", description="Trimite lista cu orele totale ale mecanicilor în privat (DM)")
 async def pontaje(interaction: discord.Interaction):
