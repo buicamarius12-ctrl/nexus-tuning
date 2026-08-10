@@ -186,7 +186,7 @@ async def on_ready():
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
 async def setup_pontaj(interaction: discord.Interaction):
     if not are_rolul_permis(interaction):
-        await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}`.", ephemeral=True)
+        await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru a folosi această comandă.", ephemeral=True)
         return
 
     await interaction.response.defer(ephemeral=True)
@@ -208,7 +208,7 @@ async def setup_pontaj(interaction: discord.Interaction):
 @bot.tree.command(name="pontaje", description="Trimite lista cu orele totale ale mecanicilor în privat (DM)")
 async def pontaje(interaction: discord.Interaction):
     if not are_rolul_permis(interaction):
-        await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}`.", ephemeral=True)
+        await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru a folosi această comandă.", ephemeral=True)
         return
 
     await interaction.response.defer(ephemeral=True)
@@ -237,7 +237,7 @@ async def pontaje(interaction: discord.Interaction):
 @bot.tree.command(name="ture_active", description="Trimite lista cu mecanicii aflați ÎN TURĂ ACUM în privat (DM)")
 async def ture_active(interaction: discord.Interaction):
     if not are_rolul_permis(interaction):
-        await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}`.", ephemeral=True)
+        await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru a folosi această comandă.", ephemeral=True)
         return
 
     await interaction.response.defer(ephemeral=True)
@@ -266,7 +266,7 @@ async def ture_active(interaction: discord.Interaction):
 @bot.tree.command(name="reset_pontaje", description="Resetează toate orele și turele")
 async def reset_pontaje(interaction: discord.Interaction):
     if not are_rolul_permis(interaction):
-        await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}`.", ephemeral=True)
+        await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru a folosi această comandă.", ephemeral=True)
         return
 
     await interaction.response.defer(ephemeral=True)
