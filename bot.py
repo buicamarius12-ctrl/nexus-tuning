@@ -174,11 +174,14 @@ class PontajView(discord.ui.View):
 @bot.event
 async def on_ready():
     bot.add_view(PontajView())
-    try:
-        await bot.tree.sync()
-        print(f"✅ Comenzi sincronizate global cu succes! Bot logat ca {bot.user}")
-    except Exception as e:
-        print(f"❌ Eroare la sincronizarea comenzilor: {e}")
+    print(f"🤖 Bot conectat ca {bot.user}")
+    for guild in bot.guilds:
+        try:
+            bot.tree.copy_global_to(guild=guild)
+            await bot.tree.sync(guild=guild)
+            print(f"✅ Comenzi sincronizate instant pe serverul: {guild.name}")
+        except Exception as e:
+            print(f"❌ Eroare sync pe {guild.name}: {e}")
 
 @bot.tree.command(name="setup_pontaj", description="Trimite panoul principal pentru pontaj mecanici")
 async def setup_pontaj(interaction: discord.Interaction):
