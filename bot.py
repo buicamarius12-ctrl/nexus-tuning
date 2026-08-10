@@ -189,7 +189,8 @@ async def setup_pontaj(interaction: discord.Interaction):
         await interaction.response.send_message(f"⚠️ **Acces interzis!** Ai nevoie de rolul `{ROL_PERMIS}` pentru a folosi această comandă.", ephemeral=True)
         return
 
-    await interaction.response.defer(ephemeral=True)
+    # Răspuns efemer ascuns doar pentru administrator ca să știe că a mers comanda
+    await interaction.response.send_message("✅ Panoul de pontaj a fost trimis public!", ephemeral=True)
 
     embed = discord.Embed(
         title="🛠️ Nexus Tuning — Pontaj Mecanici",
@@ -203,7 +204,9 @@ async def setup_pontaj(interaction: discord.Interaction):
         color=discord.Color.teal()
     )
     embed.set_footer(text="Nexus Tuning • Keep tuning, keep driving! 🛠️")
-    await interaction.followup.send(embed=embed, view=PontajView(), ephemeral=True)
+    
+    # Trimite panoul public pe canal pentru toată lumea
+    await interaction.channel.send(embed=embed, view=PontajView())
 
 @bot.tree.command(name="pontaje", description="Trimite lista cu orele totale ale mecanicilor în privat (DM)")
 async def pontaje(interaction: discord.Interaction):
